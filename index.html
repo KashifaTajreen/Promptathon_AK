@@ -1,1 +1,789 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Quantum Dreamscape</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="game-styles.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#030310;overflow:hidden;height:100vh;font-family:'Orbitron',sans-serif;touch-action:none}
+canvas{width:100vw;height:100vh;display:block}
 
+/* ── Overlays ── */
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;transition:opacity .6s,visibility .6s}
+.screen.hidden{opacity:0;visibility:hidden;pointer-events:none}
+#startScreen{background:linear-gradient(160deg,#030310 0%,#080530 50%,#030310 100%)}
+#gameOverScreen,#winScreen{background:rgba(3,3,16,.88)}
+
+/* Title */
+.game-title{font-size:clamp(2.4rem,5vw,4.2rem);font-weight:900;color:#fff;text-align:center;line-height:1.1;letter-spacing:3px;text-transform:uppercase;text-shadow:0 0 20px rgba(0,200,255,.8),0 0 50px rgba(0,80,255,.5);animation:titlePulse 3s infinite alternate}
+@keyframes titlePulse{from{text-shadow:0 0 20px rgba(0,200,255,.8),0 0 50px rgba(0,80,255,.5)}to{text-shadow:0 0 35px rgba(0,242,254,1),0 0 70px rgba(0,120,255,.7)}}
+
+/* CSS Robot */
+.char-wrap{position:relative;animation:robotBob 2s infinite ease-in-out}
+@keyframes robotBob{0%,100%{transform:translateY(0)}50%{transform:translateY(-16px)}}
+.bubble{position:absolute;top:-45px;right:-180px;background:rgba(0,160,255,.12);border:2px solid #00f2fe;border-radius:18px 18px 18px 5px;padding:11px 20px;color:#fff;font-family:'Rajdhani',sans-serif;font-weight:700;font-size:1rem;letter-spacing:1px;box-shadow:0 0 18px rgba(0,242,254,.45);backdrop-filter:blur(5px);animation:bubbleFloat 3s infinite ease-in-out;cursor:pointer;white-space:nowrap;z-index:10}
+.bubble-tail{position:absolute;bottom:-13px;left:18px;width:0;height:0;border-left:13px solid transparent;border-right:13px solid transparent;border-top:13px solid #00f2fe}
+@keyframes bubbleFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+.robot{position:relative;width:138px;height:162px}
+.robot .head{width:116px;height:86px;background:#fff;border-radius:40px;margin:0 auto;position:relative;box-shadow:inset -3px -3px 10px rgba(0,0,0,.07),0 0 18px rgba(0,200,255,.2);z-index:2}
+.robot .ears{position:absolute;top:32px;width:140px;left:-12px;height:19px;background:#111;border-radius:9px;z-index:-1}
+.robot .face{width:86px;height:46px;background:#111;border-radius:16px;position:absolute;top:20px;left:15px;display:flex;justify-content:space-around;align-items:center;padding:0 10px}
+.robot .eye{width:17px;height:25px;background:#00f2fe;border-radius:9px;box-shadow:0 0 12px #00f2fe;animation:blink 4s infinite}
+@keyframes blink{0%,94%,98%,100%{transform:scaleY(1)}96%{transform:scaleY(.08)}}
+.robot .body{width:76px;height:66px;background:#fff;border-radius:26px;margin:-7px auto 0;position:relative;box-shadow:inset -3px -3px 10px rgba(0,0,0,.07);z-index:1}
+.robot .core{width:22px;height:22px;background:#00f2fe;border-radius:50%;position:absolute;top:20px;left:27px;box-shadow:0 0 14px #00f2fe;animation:corePulse 2s infinite}
+@keyframes corePulse{0%,100%{box-shadow:0 0 14px #00f2fe}50%{box-shadow:0 0 28px #00f2fe,0 0 45px #0080ff}}
+.robot .arm{width:23px;height:56px;background:#111;border-radius:11px;position:absolute;top:80px;z-index:0}
+.robot .arm::after{width:23px;height:30px;background:#fff;border-radius:11px;content:'';position:absolute;bottom:0;left:0}
+.robot .arm.left{left:11px;transform:rotate(30deg);transform-origin:top center}
+.robot .arm.right{right:11px;transform-origin:top center;animation:wave 1.5s infinite ease-in-out}
+@keyframes wave{0%,100%{transform:rotate(-28deg)}50%{transform:rotate(-95deg)}}
+
+/* Buttons */
+.btn{padding:13px 45px;font-family:'Orbitron',sans-serif;font-size:1.2rem;font-weight:700;color:#fff;background:linear-gradient(90deg,#0055ff,#00f2fe);border:none;border-radius:28px;cursor:pointer;letter-spacing:2px;text-transform:uppercase;box-shadow:0 0 22px rgba(0,180,255,.45),0 8px 20px rgba(0,0,0,.35);transition:transform .2s,box-shadow .2s}
+.btn:hover{transform:scale(1.06) translateY(-2px);box-shadow:0 0 38px rgba(0,200,255,.7)}
+
+/* Controls */
+.controls{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;font-family:'Rajdhani',sans-serif;font-size:.88rem;color:rgba(0,242,254,.65);letter-spacing:.5px}
+.key{background:rgba(0,242,254,.1);border:1px solid rgba(0,242,254,.3);padding:3px 9px;border-radius:5px}
+</style>
+</head>
+<body>
+
+<!-- ── START ── -->
+<div id="startScreen" class="screen">
+  <h1 class="game-title">SPACE<br>MARIO</h1>
+  <div class="char-wrap">
+    <div class="bubble" onclick="speak()">Hi, welcome to game! <div class="bubble-tail"></div></div>
+    <div class="robot">
+      <div class="head"><div class="ears"></div><div class="face"><div class="eye"></div><div class="eye"></div></div></div>
+      <div class="arm left"></div><div class="arm right"></div>
+      <div class="body"><div class="core"></div></div>
+    </div>
+  </div>
+  <div class="controls">
+    <span><span class="key">SPACE</span> Float up</span>
+    <span><span class="key">→</span> Speed boost</span>
+    <span><span class="key">F / Click</span> Fire laser</span>
+    <span><span class="key">P</span> Pause</span>
+  </div>
+  <button class="btn" id="startBtn">▶ LAUNCH MISSION</button>
+</div>
+
+<!-- ── GAME OVER ── -->
+<div id="gameOverScreen" class="screen hidden">
+  <h1 class="game-title" style="color:#ff4466;text-shadow:0 0 20px #ff4466">SYSTEM FAILURE</h1>
+  <h2 id="finalScore" style="color:#aac;font-family:'Rajdhani',sans-serif;font-weight:600;letter-spacing:2px"></h2>
+  <button class="btn" onclick="location.reload()">REPLAY</button>
+</div>
+
+<!-- ── WIN ── -->
+<div id="winScreen" class="screen hidden">
+  <h1 class="game-title" style="color:#00f2fe">MISSION COMPLETE!</h1>
+  <button class="btn" onclick="location.reload()">PLAY AGAIN</button>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+// ─────────────────────────────────────────────────────────────────
+const C  = document.getElementById('gameCanvas');
+const cx = C.getContext('2d');
+window.gameCanvas = C; window.gameCtx = cx;
+
+// roundRect polyfill
+if (!CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function(x,y,w,h,r){
+    r=Math.min(r||0,w/2,h/2);
+    this.beginPath();
+    this.moveTo(x+r,y); this.lineTo(x+w-r,y); this.quadraticCurveTo(x+w,y,x+w,y+r);
+    this.lineTo(x+w,y+h-r); this.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+    this.lineTo(x+r,y+h); this.quadraticCurveTo(x,y+h,x,y+h-r);
+    this.lineTo(x,y+r); this.quadraticCurveTo(x,y,x+r,y);
+    this.closePath(); return this;
+  };
+}
+
+// ── State
+let state={status:'intro',frames:0,distance:0,baseSpeed:8,currentSpeed:8,shake:0};
+window.state=state; window.advPaused=false;
+const keys={Space:false,ArrowRight:false};
+
+// ── UI refs
+const UI={
+  start:  document.getElementById('startScreen'),
+  over:   document.getElementById('gameOverScreen'),
+  win:    document.getElementById('winScreen'),
+  score:  document.getElementById('finalScore'),
+};
+
+// ── Ground Y
+const GY=()=>C.height-90;
+
+// ── Stars (static after resize)
+let STARS=[];
+function makeStars(){
+  STARS=Array.from({length:240},()=>({
+    x:Math.random()*C.width, y:Math.random()*(C.height*0.88),
+    r:Math.random()*1.6+0.25,
+    tw:Math.random()*Math.PI*2,
+    ts:Math.random()*0.018+0.005,
+    base:Math.random()*0.45+0.2,
+    cold:Math.random()>.8
+  }));
+}
+
+// ── Resize
+function resize(){
+  C.width=window.innerWidth; C.height=window.innerHeight;
+  makeStars();
+}
+window.addEventListener('resize',resize);
+
+// ── SFX
+function playSfx(type){
+  try{
+    const ac=new(window.AudioContext||window.webkitAudioContext)();
+    const o=ac.createOscillator(), g=ac.createGain();
+    o.connect(g); g.connect(ac.destination);
+    const t=ac.currentTime;
+    if(type==='jump'){
+      o.type='square';
+      o.frequency.setValueAtTime(280,t); o.frequency.exponentialRampToValueAtTime(560,t+.1);
+      g.gain.setValueAtTime(.07,t); g.gain.exponentialRampToValueAtTime(.001,t+.1);
+      o.start(t); o.stop(t+.1);
+    } else if(type==='thrust'){
+      o.type='triangle';
+      o.frequency.setValueAtTime(160,t); o.frequency.exponentialRampToValueAtTime(60,t+.2);
+      g.gain.setValueAtTime(.06,t); g.gain.exponentialRampToValueAtTime(.001,t+.2);
+      o.start(t); o.stop(t+.2);
+    } else if(type==='hit'){
+      o.type='sawtooth';
+      o.frequency.setValueAtTime(130,t); o.frequency.exponentialRampToValueAtTime(10,t+.32);
+      g.gain.setValueAtTime(.18,t); g.gain.exponentialRampToValueAtTime(.001,t+.32);
+      o.start(t); o.stop(t+.32);
+    } else if(type==='laser'){
+      o.type='sawtooth';
+      o.frequency.setValueAtTime(1500,t); o.frequency.exponentialRampToValueAtTime(150,t+.15);
+      g.gain.setValueAtTime(.12,t); g.gain.exponentialRampToValueAtTime(.001,t+.15);
+      o.start(t); o.stop(t+.15);
+    } else if(type==='coin'){
+      o.type='sine';
+      o.frequency.setValueAtTime(900,t); o.frequency.setValueAtTime(1350,t+.07); o.frequency.setValueAtTime(1800,t+.13);
+      g.gain.setValueAtTime(.1,t); g.gain.exponentialRampToValueAtTime(.001,t+.28);
+      o.start(t); o.stop(t+.28);
+    }
+  }catch(_){}
+}
+window.playSfx=playSfx;
+
+// ── Floating Exclamation Text ──
+window.showExclamation = function(x,y,msg,col) {
+    const el = document.createElement('div');
+    el.style.position = 'absolute';
+    el.style.left = `${x-20}px`; el.style.top = `${y-40}px`;
+    el.style.color = col; el.style.fontWeight = '900'; el.style.fontSize = '2rem';
+    el.style.fontFamily = "'Orbitron', sans-serif";
+    el.style.textShadow = `0 0 10px ${col}, 0 0 20px #fff`; 
+    el.style.pointerEvents = 'none';
+    el.style.zIndex = '9999';
+    el.innerHTML = msg;
+    document.body.appendChild(el);
+    let top = y-40; let op = 1; let scale = 0.5;
+    const f=()=>{
+        top-=1.5; op-=0.02; scale = Math.min(1.2, scale+0.05);
+        el.style.top=`${top}px`; el.style.opacity=op;
+        el.style.transform = `scale(${scale})`;
+        if(op>0) requestAnimationFrame(f); else el.remove();
+    };
+    f();
+};
+
+// ═══════════════════════════════════════════
+// PLATFORM  (continuous neon-edged ground)
+// ═══════════════════════════════════════════
+const GROUND_COLORS=['#0d1a2e','#100d1e','#0d1e0d','#1e0d0d','#0d1e1e','#160d20','#0e1420','#090c20'];
+class Platform{
+  constructor(x,w,idx){
+    this.x=x; this.w=w; this.y=GY();
+    this.color=GROUND_COLORS[idx%GROUND_COLORS.length];
+  }
+  update(){ this.y=GY(); this.x-=state.currentSpeed; }
+  draw(){
+    const gy=this.y;
+    const gr=cx.createLinearGradient(0,gy,0,C.height);
+    gr.addColorStop(0,this.color); gr.addColorStop(.12,'#080818'); gr.addColorStop(1,'#030310');
+    cx.fillStyle=gr;
+    cx.fillRect(this.x,gy,this.w,C.height-gy+10);
+    // Neon top line
+    cx.save();
+    cx.shadowColor='#00bbff'; cx.shadowBlur=14;
+    cx.strokeStyle='#00ddff'; cx.lineWidth=2.5;
+    cx.beginPath(); cx.moveTo(this.x,gy); cx.lineTo(this.x+this.w,gy); cx.stroke();
+    cx.restore();
+    // Subtle grid
+    cx.save(); cx.globalAlpha=.045; cx.strokeStyle='#00f2fe'; cx.lineWidth=1;
+    for(let lx=Math.floor(this.x/80)*80;lx<this.x+this.w;lx+=80){
+      cx.beginPath(); cx.moveTo(lx,gy); cx.lineTo(lx,C.height); cx.stroke();
+    }
+    for(let ly=gy+38;ly<C.height;ly+=38){
+      cx.beginPath(); cx.moveTo(this.x,ly); cx.lineTo(this.x+this.w,ly); cx.stroke();
+    }
+    cx.restore();
+  }
+}
+
+// ═══════════════════════════════════════════
+// IEEE COIN TOKEN
+// ═══════════════════════════════════════════
+class IEEECoin{
+  constructor(x,y){
+    this.x=x; this.baseY=y; this.y=y;
+    this.r=24; this.bobPhase=Math.random()*Math.PI*2;
+    this.collected=false; this.collectAnim=0;
+  }
+  update(){
+    this.x-=state.currentSpeed;
+    this.y=this.baseY+Math.sin(state.frames*.05+this.bobPhase)*5;
+    if(this.collected){ this.collectAnim++; this.baseY-=1.5; }
+  }
+  draw(){
+    if(this.collected && this.collectAnim>18) return;
+    cx.save();
+    cx.translate(this.x,this.y);
+    if(this.collected){
+      cx.globalAlpha=Math.max(0,1-this.collectAnim/18);
+      cx.scale(1+this.collectAnim*.04,1+this.collectAnim*.04);
+    }
+    // Yellow body with orange border matching the request
+    const cg = cx.createRadialGradient(-5,-5,2,0,0,this.r);
+    cg.addColorStop(0,'#ffffcc'); cg.addColorStop(.5,'#ffd700'); cg.addColorStop(1,'#ff8800');
+    cx.fillStyle = cg; 
+    cx.strokeStyle = '#ffbb00'; 
+    cx.lineWidth = 2.5;
+    cx.shadowColor = '#ffd700'; cx.shadowBlur = 12;
+    cx.beginPath(); cx.arc(0,0,this.r,0,Math.PI*2); cx.fill(); cx.stroke();
+    
+    // Core phi/1 symbol (White for contrast against yellow)
+    cx.shadowBlur = 0;
+    cx.strokeStyle = '#ffffff';
+    cx.lineWidth = 3.5;
+    cx.beginPath(); cx.ellipse(0,0,this.r*.45,this.r*.3, 0, 0, Math.PI*2); cx.stroke();
+    cx.fillStyle = '#ffffff';
+    cx.fillRect(-1.8, -this.r*.52, 3.6, this.r*1.04); // Vertical line
+    cx.fillRect(-6, -this.r*.52, 12, 3); // top serif
+    cx.fillRect(-7, this.r*.52 - 3, 14, 3); // bottom serif
+    cx.restore();
+  }
+  check(player){
+    if(this.collected) return false;
+    const dx=this.x-(player.x+player.w/2), dy=this.y-(player.y+player.h/2);
+    if(Math.sqrt(dx*dx+dy*dy)<this.r+28){ this.collected=true; return true; }
+    return false;
+  }
+}
+
+// ═══════════════════════════════════════════
+// PLANET OBSTACLE  (rolls on ground)
+// ═══════════════════════════════════════════
+const PALETTES=[
+  {b:'#bb3311',s:'#ff6633',c:'#550a00'},
+  {b:'#224faa',s:'#55aaff',c:'#0a1550'},
+  {b:'#7a30cc',s:'#cc77ff',c:'#2a0060'},
+  {b:'#0f9070',s:'#33ffcc',c:'#003322'},
+  {b:'#9a7010',s:'#ffdd44',c:'#3a2500'},
+];
+class Planet{
+  constructor(){
+    this.r=Math.random()*40+50; // 50-90px radius - Big!
+    this.x=C.width+this.r+20;
+    this.rollAngle=0;
+    this.rollSpeed=Math.random()*.8+.5;
+    this.pal=PALETTES[Math.floor(Math.random()*PALETTES.length)];
+    this.hasRing=Math.random()>.55;
+    this._passedRewarded=false;
+    this._zeroGAngle=0;
+  }
+  get y(){ return GY()-this.r; }
+  update(){
+    const spd=this.rollSpeed+state.currentSpeed*.28;
+    this.x-=spd;
+    this.rollAngle+=spd/this.r;
+  }
+  draw(){
+    const py=this.y;
+    cx.save(); cx.translate(this.x,py); cx.rotate(this.rollAngle+(this._zeroGAngle||0));
+    cx.shadowColor=this.pal.s; cx.shadowBlur=14+Math.sin(state.frames*.16)*5;
+    const bg=cx.createRadialGradient(-this.r*.28,-this.r*.28,this.r*.06,0,0,this.r);
+    bg.addColorStop(0,this.pal.s); bg.addColorStop(.4,this.pal.b); bg.addColorStop(1,this.pal.c);
+    cx.fillStyle=bg; cx.beginPath(); cx.arc(0,0,this.r,0,Math.PI*2); cx.fill();
+    if(this.hasRing){
+      cx.shadowBlur=0; cx.strokeStyle=this.pal.s+'88'; cx.lineWidth=this.r*.18;
+      cx.globalAlpha=.5; cx.beginPath();
+      cx.ellipse(0,0,this.r*1.55,this.r*.3,.35,0,Math.PI*2); cx.stroke(); cx.globalAlpha=1;
+    }
+    cx.shadowBlur=0; cx.fillStyle=this.pal.c; cx.globalAlpha=.6;
+    cx.beginPath(); cx.arc(-this.r*.27,-this.r*.2,this.r*.26,0,Math.PI*2); cx.fill();
+    cx.beginPath(); cx.arc(this.r*.3,this.r*.12,this.r*.13,0,Math.PI*2); cx.fill();
+    cx.globalAlpha=1; cx.fillStyle='rgba(255,255,255,.2)';
+    cx.beginPath(); cx.arc(-this.r*.32,-this.r*.3,this.r*.16,0,Math.PI*2); cx.fill();
+    cx.restore();
+    // Ground shadow
+    cx.save(); cx.translate(this.x,GY());
+    cx.fillStyle='rgba(0,0,0,.3)'; cx.beginPath();
+    cx.ellipse(0,6,this.r*.82+.1,this.r*.15+.1,0,0,Math.PI*2); cx.fill(); cx.restore();
+  }
+}
+
+// ═══════════════════════════════════════════
+// TRUE ASTEROID (Targets from space, enables cinematic layer)
+// ═══════════════════════════════════════════
+class TrueAsteroid {
+  constructor() {
+    this.r = 25 + Math.random()*15;
+    this.x = C.width + 100;
+    this.y = player.y + (Math.random() * 80 - 40);
+    this.vx = -6 - Math.random()*3;
+    this.vy = (player.y - this.y) * 0.01;
+    this.rot = 0;
+    this.spin = (Math.random()-.5)*0.1;
+    this._nearMissRewarded=false;
+    this._zeroGAngle=0;
+    this.verts = Array.from({length:8}, ()=>this.r*(0.8+Math.random()*0.2));
+  }
+  update() {
+    this.x += this.vx - state.currentSpeed*0.1;
+    this.y += this.vy;
+    this.rot += this.spin;
+  }
+  draw() {
+    cx.save(); cx.translate(this.x, this.y); cx.rotate(this.rot + (this._zeroGAngle||0));
+    
+    // Draw fiery tail extending to the right
+    const tailGrad = cx.createLinearGradient(0, -this.r, this.r * 5, this.r);
+    tailGrad.addColorStop(0, 'rgba(255, 200, 0, 0.9)');
+    tailGrad.addColorStop(0.4, 'rgba(255, 50, 0, 0.5)');
+    tailGrad.addColorStop(1, 'rgba(255, 0, 0, 0)');
+    cx.fillStyle = tailGrad;
+    cx.beginPath();
+    cx.moveTo(0, -this.r * 0.7);
+    cx.lineTo(this.r * 5.5, -this.r * 0.1);
+    cx.lineTo(this.r * 4.0, this.r * 0.8);
+    cx.lineTo(0, this.r * 0.7);
+    cx.fill();
+
+    cx.fillStyle='#442211'; cx.shadowColor='#ff3300'; cx.shadowBlur=25;
+    cx.beginPath();
+    for (let i = 0; i < 8; i++) {
+        const ag = (i / 8) * Math.PI * 2;
+        const rad = this.verts[i];
+        if (i === 0) cx.moveTo(Math.cos(ag) * rad, Math.sin(ag) * rad);
+        else cx.lineTo(Math.cos(ag) * rad, Math.sin(ag) * rad);
+    }
+    cx.closePath(); cx.fill();
+    cx.fillStyle='#443322'; cx.globalAlpha=0.6;
+    cx.beginPath(); cx.arc(-this.r*.3, -this.r*.2, this.r*.3, 0, Math.PI*2); cx.fill();
+    cx.restore();
+  }
+}
+
+// ═══════════════════════════════════════════
+// PARTICLE
+// ═══════════════════════════════════════════
+class Particle{
+  constructor(x,y,col){
+    this.x=x; this.y=y;
+    this.vx=(Math.random()-.5)*5; this.vy=(Math.random()-.5)*5;
+    this.color=col; this.alpha=1; this.size=Math.random()*4+1.2;
+  }
+  update(){ this.x+=this.vx; this.y+=this.vy; this.alpha-=.026; this.size*=.96; }
+  draw(){
+    cx.save(); cx.globalAlpha=Math.max(0,this.alpha);
+    cx.fillStyle=this.color; cx.shadowColor=this.color; cx.shadowBlur=6;
+    cx.beginPath(); cx.arc(this.x,this.y,Math.max(.1,this.size),0,Math.PI*2); cx.fill(); cx.restore();
+  }
+}
+window.Particle=Particle;
+
+// ═══════════════════════════════════════════
+// ROBOT DRAW  (matching CSS robot, facing right, NO LEGS)
+// ═══════════════════════════════════════════
+function drawRobot(ctx,x,y,frame,isZeroG,thrustOn){
+  ctx.save(); ctx.translate(x,y);
+  const W=44, H=54;
+
+  // Lean forward when thrusting
+  const tilt = thrustOn ? -.12 : (isZeroG ? Math.sin(frame*.04)*.08 : -.05);
+  ctx.rotate(tilt);
+
+  // ── Boot jets (bottom of body, two nozzles) ──
+  const jStrength = thrustOn ? 1 : .45;
+  for(let i=0;i<2;i++){
+    const jx = i===0 ? W*.28 : W*.72;
+    const jh = (thrustOn ? 18+Math.random()*14 : 8+Math.random()*6) * jStrength;
+    ctx.save();
+    ctx.globalAlpha=.55+Math.random()*.35;
+    ctx.shadowColor='#ff00ff'; ctx.shadowBlur=10;
+    const jg=ctx.createLinearGradient(jx,H,jx,H+jh);
+    jg.addColorStop(0,'#ff00ff'); jg.addColorStop(.4,'#8800ff'); jg.addColorStop(1,'rgba(100,0,200,0)');
+    ctx.fillStyle=jg;
+    ctx.beginPath(); ctx.ellipse(jx,H+jh*.5,6,jh*.55,0,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+  ctx.globalAlpha=1;
+
+  // ── Back arm (right side, simple) ──
+  ctx.fillStyle='#111'; ctx.shadowColor='#00f2fe'; ctx.shadowBlur=3;
+  ctx.beginPath(); ctx.roundRect(W-2,H*.36,11,20,4); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(W-1,H*.36+19,13,13,4); ctx.fill();
+
+  // ── Body ── white rounded like CSS
+  ctx.shadowColor='#00f2fe'; ctx.shadowBlur=10;
+  ctx.fillStyle='#ffffff';
+  ctx.beginPath(); ctx.roundRect(4,H*.33,W-8,H*.52,14); ctx.fill();
+  // Armor lines
+  ctx.strokeStyle='rgba(0,200,255,.18)'; ctx.lineWidth=1; ctx.shadowBlur=0;
+  for(let li=0;li<3;li++){
+    ctx.beginPath(); ctx.moveTo(9,H*.38+li*8); ctx.lineTo(W-9,H*.38+li*8); ctx.stroke();
+  }
+  // Energy core
+  const cp=.85+.15*Math.sin(frame*.12);
+  const cg=ctx.createRadialGradient(W/2,H*.56,0,W/2,H*.56,9*cp);
+  cg.addColorStop(0,'#fff'); cg.addColorStop(.4,'#00f2fe'); cg.addColorStop(1,'rgba(0,160,255,0)');
+  ctx.shadowColor='#00f2fe'; ctx.shadowBlur=18*cp;
+  ctx.fillStyle=cg; ctx.beginPath(); ctx.arc(W/2,H*.56,8*cp,0,Math.PI*2); ctx.fill();
+
+  // ── Front arm (LEFT side) with laser cannon pointing RIGHT ──
+  ctx.save();
+  ctx.translate(-4,H*.38);
+  ctx.rotate(-.1);
+  ctx.fillStyle='#111'; ctx.shadowColor='#00f2fe'; ctx.shadowBlur=4;
+  ctx.beginPath(); ctx.roundRect(-5,0,11,18,4); ctx.fill();
+  ctx.translate(-2,17);
+  ctx.fillStyle='#1a1a2e';
+  ctx.beginPath(); ctx.roundRect(-5,0,13,13,4); ctx.fill();
+  // Barrel pointing RIGHT (toward planets)
+  ctx.fillStyle='#00f2fe'; ctx.shadowColor='#00f2fe'; ctx.shadowBlur=14;
+  ctx.beginPath(); ctx.roundRect(-6,8,24,5,3); ctx.fill();
+  // Muzzle glow
+  ctx.beginPath(); ctx.arc(18,10,4.5,0,Math.PI*2);
+  ctx.fillStyle='rgba(0,242,254,.5)'; ctx.fill();
+  ctx.restore();
+
+  // ── Head ── white very round like CSS
+  ctx.shadowColor='#00f2fe'; ctx.shadowBlur=9;
+  ctx.fillStyle='#ffffff';
+  ctx.beginPath(); ctx.roundRect(3,0,W-6,H*.33,18); ctx.fill();
+  // Ears band
+  ctx.shadowBlur=0; ctx.fillStyle='#111';
+  ctx.beginPath(); ctx.roundRect(-5,H*.09,W+10,H*.07,4); ctx.fill();
+  // Face screen
+  ctx.fillStyle='#111';
+  ctx.beginPath(); ctx.roundRect(9,H*.045,W-18,H*.22,7); ctx.fill();
+  // Eyes - right side only to look right
+  const ew=.8+.2*Math.sin(frame*.09);
+  const blink=Math.sin(frame/240*Math.PI*2*3+1)>.96?.1:1;
+  ctx.shadowColor='#00f2fe'; ctx.shadowBlur=12*ew;
+  ctx.fillStyle=`rgba(0,242,254,${ew})`;
+  ctx.save(); ctx.scale(1,blink);
+  ctx.beginPath(); ctx.ellipse(W-10,H*.155/blink,5,7.5,0,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+  // Antenna
+  ctx.strokeStyle='#00ccff'; ctx.lineWidth=2; ctx.shadowBlur=6;
+  ctx.beginPath(); ctx.moveTo(W/2,0); ctx.lineTo(W/2,-11); ctx.stroke();
+  ctx.fillStyle='#00f2fe'; ctx.shadowBlur=14;
+  ctx.beginPath(); ctx.arc(W/2,-13,3.5,0,Math.PI*2); ctx.fill();
+
+  ctx.restore();
+}
+window.drawCanvasRobot=drawRobot;
+
+// ═══════════════════════════════════════════
+// DARK SPACE BACKGROUND
+// ═══════════════════════════════════════════
+function drawBG(){
+  cx.fillStyle='#030310'; cx.fillRect(0,0,C.width,C.height);
+  // Nebula blobs - brighter and clearer
+  const n1=cx.createRadialGradient(C.width*.32,C.height*.3,0,C.width*.32,C.height*.3,C.width*.5);
+  n1.addColorStop(0,'rgba(35,10,85,.7)'); n1.addColorStop(1,'rgba(0,0,0,0)');
+  cx.fillStyle=n1; cx.fillRect(0,0,C.width,C.height);
+  const n2=cx.createRadialGradient(C.width*.78,C.height*.22,0,C.width*.78,C.height*.22,C.width*.38);
+  n2.addColorStop(0,'rgba(0,40,118,.55)'); n2.addColorStop(1,'rgba(0,0,0,0)');
+  cx.fillStyle=n2; cx.fillRect(0,0,C.width,C.height);
+  // Slow swirl
+  cx.save(); cx.translate(C.width*.5,C.height*.42); cx.rotate(state.frames*.0003);
+  cx.lineWidth=70; cx.lineCap='round';
+  for(let i=0;i<4;i++){
+    cx.beginPath();
+    cx.strokeStyle=i%2===0?'rgba(0,60,140,.035)':'rgba(30,0,70,.035)';
+    cx.arc(0,0,180+i*150,i*.6,i*.6+Math.PI*1.1); cx.stroke();
+  }
+  cx.restore();
+  // Stars as glowing dots
+  for(const s of STARS){
+    s.tw+=s.ts;
+    const br=s.base+(1-s.base)*Math.abs(Math.sin(s.tw));
+    cx.save(); cx.globalAlpha=br;
+    cx.shadowColor=s.cold?'#aadeff':'#ffffff'; cx.shadowBlur=br*5;
+    cx.fillStyle=s.cold?'#cceeff':'#ffffff';
+    cx.beginPath(); cx.arc(s.x,s.y,s.r,0,Math.PI*2); cx.fill();
+    cx.restore();
+  }
+}
+window.drawImpastoBackground=drawBG;
+
+// ═══════════════════════════════════════════
+// PLAYER  (floater — space = thrust up)
+// ═══════════════════════════════════════════
+class Player{
+  constructor(){
+    this.w=44; this.h=54;
+    this.x=130; this.y=C.height*.48;
+    this.vy=0; this.gravity=.35; this.maxDown=8;
+    this.thrustPower=-1.2; this.maxUp=-9;
+    this.grounded=false; this.thrusting=false;
+  }
+  update(){
+    this.thrusting=keys.Space;
+    if(keys.Space){
+      this.vy=Math.max(this.vy+this.thrustPower, this.maxUp);
+      if(state.frames%4===0)
+        particles.push(new Particle(this.x+this.w*.5,this.y+this.h,'#aa00ff'));
+    } else {
+      // Float down gently when not trusting
+      this.vy=Math.min(this.vy+this.gravity, this.maxDown);
+    }
+    this.y+=this.vy;
+    // Ground
+    const gy=GY();
+    if(this.y+this.h>=gy){ this.y=gy-this.h; this.vy=0; this.grounded=true; }
+    else this.grounded=false;
+    // Ceiling
+    if(this.y<10){ this.y=10; this.vy=0; }
+    // Exhaust when grounded
+    if(this.grounded && state.frames%5===0){
+      particles.push(new Particle(this.x+this.w*.28,this.y+this.h-2,'#ff00ff'));
+      particles.push(new Particle(this.x+this.w*.72,this.y+this.h-2,'#cc00ff'));
+    }
+  }
+  draw(){
+    drawRobot(cx,this.x,this.y,state.frames,false,this.thrusting||!this.grounded);
+  }
+}
+window.Player=Player;
+
+// ═══════════════════════════════════════════
+// GAME GLOBALS
+// ═══════════════════════════════════════════
+let player=new Player();
+let platforms=[], planets=[], trueAsteroids=[], coins=[], particles=[];
+window.player=player;
+window.platforms=platforms; window.planets=planets;
+window.asteroids=trueAsteroids; // advanced modules use window.asteroids
+window.coins=coins;
+window.particles=particles;
+
+function spawnPlatform(){
+  const last=platforms[platforms.length-1];
+  const sx=last?last.x+last.w:0;
+  platforms.push(new Platform(sx,C.width*4,platforms.length));
+}
+
+function spawnCoinRow(){
+  const n=4+Math.floor(Math.random()*4);
+  const cy=GY()-90-Math.random()*160;
+  const lastC = coins[coins.length-1];
+  let startX = C.width + 50;
+  if(lastC && lastC.x > C.width) startX = lastC.x + 80;
+  for(let i=0;i<n;i++)
+    coins.push(new IEEECoin(startX+i*55, cy));
+}
+
+// ── Init
+function initGame(){
+  state={status:'playing',frames:0,distance:0,baseSpeed:8,currentSpeed:8,shake:0};
+  window.state=state; window.advPaused=false;
+  player=new Player(); window.player=player;
+  platforms.length=0; planets.length=0; trueAsteroids.length=0; coins.length=0; particles.length=0;
+  // Re-expose after reset so game-features sees fresh arrays
+  window.platforms=platforms; window.planets=planets; window.asteroids=trueAsteroids;
+  window.coins=coins; window.particles=particles;
+  spawnPlatform(); spawnPlatform();
+}
+window.initGame=initGame;
+
+// ═══════════════════════════════════════════
+// MAIN LOOP
+// ═══════════════════════════════════════════
+function animate(){
+  requestAnimationFrame(animate);
+
+  cx.save();
+  if(state.shake>0){
+    cx.translate((Math.random()-.5)*state.shake,(Math.random()-.5)*state.shake);
+    state.shake*=.87; if(state.shake<.4) state.shake=0;
+  }
+
+  drawBG();
+
+  // ── Intro ──
+  if(state.status==='intro'){
+    drawRobot(cx,C.width*.5-22,C.height*.45,state.frames,true,false);
+    cx.restore(); state.frames++; return;
+  }
+  // ── Pause hook ──
+  if(window.advPaused){ cx.restore(); state.frames++; return; }
+
+  // ── Playing ──
+  if(state.status==='playing'){
+    state.distance+=state.currentSpeed;
+    if(keys.ArrowRight) state.currentSpeed=Math.min(state.currentSpeed+.3,26); // Much faster!
+    else                state.currentSpeed=Math.max(state.currentSpeed-.15, state.baseSpeed);
+    state.baseSpeed=8+Math.floor(state.distance/10000)*.6;
+
+    // Platforms
+    const lastP=platforms[platforms.length-1];
+    if(!lastP||lastP.x+lastP.w<C.width+400) spawnPlatform();
+    for(let i=platforms.length-1;i>=0;i--){
+      platforms[i].update(); platforms[i].draw();
+      if(platforms[i].x+platforms[i].w<-300) platforms.splice(i,1);
+    }
+
+    // Planet obstacles — enforce minimum spacing
+    const spawnRate=.004+state.distance*.0000006;
+    const lastPl=planets[planets.length-1];
+    const canSpawn=!lastPl||(lastPl.x<C.width-500); 
+    if(Math.random()<Math.min(spawnRate,.015)&&canSpawn) planets.push(new Planet());
+    for(let i=planets.length-1;i>=0;i--){
+      planets[i].update(); planets[i].draw();
+      // Collision
+      const pl=planets[i];
+      const nearX=Math.max(player.x+4,Math.min(pl.x,player.x+player.w-4));
+      const nearY=Math.max(player.y+4,Math.min(pl.y,player.y+player.h-4));
+      if(Math.hypot(pl.x-nearX,pl.y-nearY)<pl.r-4) triggerOver();
+      if(!pl._passedRewarded && pl.x + pl.r < player.x) {
+         pl._passedRewarded = true;
+         if(window.showExclamation) window.showExclamation(player.x, player.y - 40, "GREAT JUMP!", "#00ff00");
+      }
+      if(pl.x<-pl.r-60) planets.splice(i,1);
+    }
+
+    // True Asteroids (Flying threats)
+    if(Math.random() < 0.003 + state.distance*0.0000002) trueAsteroids.push(new TrueAsteroid());
+    for (let i=trueAsteroids.length-1;i>=0;i--){
+      trueAsteroids[i].update(); trueAsteroids[i].draw();
+      // Collision with player = penalize or hit, but no instant game over
+      const ast=trueAsteroids[i];
+      const nearX=Math.max(player.x+4,Math.min(ast.x,player.x+player.w-4));
+      const nearY=Math.max(player.y+4,Math.min(ast.y,player.y+player.h-4));
+      if(Math.hypot(ast.x-nearX,ast.y-nearY)<ast.r-4){
+         triggerOver();
+         trueAsteroids.splice(i,1);
+         continue;
+      }
+      if(ast.x < -ast.r-60) trueAsteroids.splice(i,1);
+    }
+
+    // Coins
+    if(Math.random()<.004) spawnCoinRow();
+    for(let i=coins.length-1;i>=0;i--){
+      coins[i].update(); coins[i].draw();
+      if(coins[i].check(player)){
+        playSfx('coin');
+        // award coin via game-features if loaded
+        if(window._advAwardCoin) window._advAwardCoin(coins[i].x,coins[i].y);
+      }
+      if(coins[i].x<-40||(coins[i].collected&&coins[i].collectAnim>20)) coins.splice(i,1);
+    }
+
+    // Particles
+    for(let i=particles.length-1;i>=0;i--){
+      particles[i].update(); particles[i].draw();
+      if(particles[i].alpha<=0) particles.splice(i,1);
+    }
+
+    player.update(); player.draw();
+  }
+
+  // Frozen
+  if(state.status==='gameover'||state.status==='win'){
+    platforms.forEach(p=>p.draw());
+    planets.forEach(p=>p.draw());
+    trueAsteroids.forEach(a=>a.draw());
+    particles.forEach(p=>p.draw());
+    player.draw();
+  }
+
+  cx.restore();
+  state.frames++;
+}
+window.animate=animate;
+
+// ── Triggers
+function triggerOver(){
+  if(state.status!=='playing') return;
+  state.status='gameover'; state.shake=26; playSfx('hit');
+  ['advHud','pauseBtn'].forEach(id=>{const e=document.getElementById(id);if(e)e.classList.add('hidden')});
+  UI.score.textContent=`Distance: ${Math.floor(state.distance/10)} AU`;
+  UI.over.classList.remove('hidden');
+}
+function triggerWin(){
+  if(state.status!=='playing') return;
+  state.status='win';
+  ['advHud','pauseBtn'].forEach(id=>{const e=document.getElementById(id);if(e)e.classList.add('hidden')});
+  UI.win.classList.remove('hidden');
+}
+
+// ── Input
+window.addEventListener('keydown',e=>{
+  if(e.code==='Space'){
+     if(!keys.Space) playSfx('thrust');
+     keys.Space=true; e.preventDefault();
+  }
+  if(e.code==='ArrowRight'){
+     if(!keys.ArrowRight) playSfx('thrust');
+     keys.ArrowRight=true;
+  }
+});
+window.addEventListener('keyup',e=>{
+  if(e.code==='Space') keys.Space=false;
+  if(e.code==='ArrowRight') keys.ArrowRight=false;
+});
+window.addEventListener('touchstart',()=>keys.Space=true,{passive:true});
+window.addEventListener('touchend',()=>keys.Space=false,{passive:true});
+
+document.getElementById('startBtn').addEventListener('click',()=>{
+  UI.start.classList.add('hidden'); initGame();
+});
+
+// Speech
+function speak(){
+  if(!('speechSynthesis' in window)) return;
+  speechSynthesis.cancel();
+  const m=new SpeechSynthesisUtterance("Hi, welcome to game");
+  m.pitch=2.0; // Very high pitch to simulate Doraemon
+  m.rate=1.1;
+  // Try to find a Japanese or suitable voice, fallback to english
+  const v=speechSynthesis.getVoices().find(v=>v.lang.startsWith('ja')) || speechSynthesis.getVoices().find(v=>v.lang.startsWith('en'));
+  if(v) m.voice=v; speechSynthesis.speak(m);
+}
+
+// Boot
+window.onload=()=>{ 
+  resize(); 
+  speak(); // Attempt to speak immediately
+  requestAnimationFrame(animate); 
+};
+document.body.addEventListener('click', () => { 
+  // Fallback for browsers that block autoplay
+  if (state.frames < 200 && state.status==='intro') speak(); 
+}, {once:true});
+</script>
+
+<script src="game-effects.js"></script>
+<script src="game-features.js"></script>
+</body>
+</html>
